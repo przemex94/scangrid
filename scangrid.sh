@@ -1,4 +1,4 @@
-#!/bin/bash######
+#!/bin/bash######E#####
 #scangrid.sh - A simple nmap scan wrapper.
 #written by przemex94
 username=$(whoami | cut -c -6)
