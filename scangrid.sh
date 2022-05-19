@@ -1,249 +1,234 @@
-#!/bin/bash
+#!/bin/bash#####
 #scangrid.sh - A simple nmap scan wrapper.
-#written by przemex94
+
 username=$(whoami | cut -c -6)
 year=$(date +"%Y")
 datestring=$(date +"%d-%m-%Y_%T")
-scangrid=`basename "$0"`
-options=$@
-initials=$1
-projectname=$2
-targetlist=$4
-mkdir -p /opt/scangrid/tcp
-#mkdir -p /opt/scangrid/minitcp
-mkdir -p /opt/scangrid/udp
-mkdir -p /opt/scangrid/results
+script="$0"
+initials="$1"
+projectname="$2"
+function="$3"
+targetlist="$4"
 
-#FUNCTIONS
-
-#Show logit
-show_logit(){
-    cat /opt/scangrid/logit.log
-    exit 0
-}
+#Functions
 
 #Initials input buffer
-initials_buffer(){ 
-    if [[ ${#initials} -ge 5 ]] ; then echo "Error: Bad initials. Too long!!!" ; exit 0
-    elif [[ ${#initials} -le 3 ]] ; then echo "Error: Bad initials. Too short!!!" ; exit 0
-    elif [[ $initials = *['!'@'#'\$%^\&*()_+]* ]] ; then echo "Hey!! No special chars!!"; exit 0
+initials_buffer(){
+    if [[ ${#initials} -ge 5 ]] ; then echo "Error: Bad initials. Too long!!!" ; break
+    elif [[ ${#initials} -le 3 ]] ; then echo "Error: Bad initials. Too short!!!" ; break
+    elif [[ $projectname == *['!'@'#'\$%^\&*()_+]* ]] ; break
+    else
+        :
     fi
 }
 
 #Projectname input buffer
-projectname_buffer(){ 
-    if [[ $2 == *['!'@'#'\$%^\&*()_+]* ]] ; then echo "Hey!! No special chars!!"
+projectname_buffer(){
+    if [[ $projectname == *['!'@'#'\$%^\&*()_+]* ]] ; break
+    else
+        :
     fi
 }
 
-# Put executed command to /opt/scangrid/$date/ 
-logit_buffer() { 
-    if [ -e "/opt/scangrid/logit.log" ] ; then
-        touch /opt/scangrid/logit.log
+# Put executed command to /srv/scangrid/$date/
+logit_buffer() {
+initials_buffer
+projectname_buffer
+    if [ -d "/srv/scangrid/logit.log"]; then
+        :
+    else
+        if [ -d "/srv/scangrid"]; then
+            :
+        else
+            mkdir -p /srv/scangrid
+        fi
+        touch /srv/scangrid/logit.log
     fi
-    echo "$datestring" "executed by:" $username $scangrid $options >> /opt/scangrid/logit.log
+echo $datestring "executed by:" $initials $username "$0" "$@" >> /srv/scangrid/logit.log
 }
 
 #Mini tcp scan run
-#mini_tcp_scan_run() { 
-#    scantype=$minitcp
-#    mkdir -p /opt/scangrid/minitcp/0
-#    id=`ls /opt/scangrid/minitcp/ | sort -n | uniq | tail -1`
-#    id=$((++id))
-#    mkdir -p /opt/scangrid/minitcp/$id
-#    screen -S $2+_minitcp -dm bash -c "nc -zvnw 2 $targetlist 2>&1 | tee /opt/scangrid/results/$scantype_$projectname.log"
-#    exit 1
-#}   
+mini_tcp_scan_run() {
+    logit_buffer
+    initials_buffer
+    projectname_buffer
+    id=`ls /srv/scangrid/ | sort | tail -1`
+    if [ -d "/srv/scangrid/minitcp/$id"]; then
+        id=$((++id))
+    else
+        mkdir -p /srv/scangrid/minitcp/$id
+    fi
+    screen -S $projectname+_minitcp -dm bash -c "getitfromipport tee /srv/scangrid/minitcp/$id"
+    exit 1
+}   
 
 #Tcp scan run
 tcp_scan_run() { 
-    echo "TCP SCAN STARTED!"
-    scantype="tcp"
-    mkdir -p /opt/scangrid/tcp/
-    screen -S $scantype_$projectname -dm sh -c "nmap -p- -oA /opt/scangrid/tcp/$scantype_$projectname --stats-every 1s -sC -sV $targetlist | tee /opt/scangrid/results/$scantype_$projectname.log" 
-    exit 0
+    logit_buffer
+    initials_buffer
+    projectname_buffer
+    id=`ls /srv/scangrid/ | sort | tail -1`
+    if [ -d "/srv/scangrid/minitcp/$id"]; then
+        id=$((++id))
+    else
+        mkdir -p /srv/scangrid/tcp/$id
+    fi
+    screen -S $projectname+_tcp -dm bash -c "nmap -p- -A -oA /srv/scangrid/tcp/$id --stats-every 1s --script=all --version-all --osscan-guess --unprivileged -Pn -T4 -vvv --reason | tee tcplog.log" 
+    exit 1
 }
 
 #Udp scan run
-udp_scan_run() { 
-    echo "UDP SCAN STARTED!"
-    scantype="udp"
-    mkdir -p /opt/scangrid/udp/
-    screen -S $scantype_$projectname -dm sh -c "nmap -p- -oA /opt/scangrid/udp/$scantype_$projectname --stats-every 1s -sC -sV -sU $targetlist | tee /opt/scangrid/results/$scantype_$projectname.log"
-    exit 0
+udp_scan_run() {
+    logit_buffer
+    initials_buffer
+    projectname_buffer
+    id=`ls /srv/scangrid/ | sort | tail -1`
+    if [ -d "/srv/scangrid/minitcp/$id"]; then
+        id=$((++id))
+    else
+        mkdir -p /srv/scangrid/udp/$id
+    fi
+    screen -S $projectname -dm sh -c "sudo nmap -p- -A -oA /srv/scangrid/udp/$id --stats-every 1s --script=all --version-all --osscan-guess --privileged -Pn -T4 -vvv --reason -sU | tee udplog.log"
+    exit 1
 }
 
-#List of all scans function
+#List of person scan
 list_func() {
-    templst=`ps -aux | grep 'nmap' | grep -v grep | grep -v 'SCREEN' | grep -v tee`
-    echo "$templst"
-    exit 0
+    logit_buffer
+    initials_buffer
+    projectname_buffer
+    templst=`ps -aux | grep $username | grep 'nmap' | grep -v grep | grep -v './mykmyk' | grep -v 'SCREEN'`
+    echo "$initials $templst"
+    exit 1
 }
 
 #Scan finder
 find_func() {
-    finder=`ps -aux | grep nmap | grep $username | grep $projectname | grep -v grep | grep -v 'SCREEN' | grep -v tee`
-    echo $finder
-    exit 0
+    initials_buffer
+    projectname_buffer
+    finder=`ps -aux | grep nmap | grep $username | grep $projectname | grep -v grep | grep -v 'SCREEN' | grep -v './mykmyk' | grep -v tee`
+    echo "$finder"
+    exit 1
 }
 
 #Scan results
 results_func() {
-    echo $2 && tail -2 /opt/scangrid/results/$scantype_$projectname.log | tail -2 | grep -v grep | grep "Timing: About" | xargs -n 1 | grep %
-    exit 0
-}
-
-show_scan_udp_xml() {
-    cat /opt/scangrid/udp/$projectname.xml
-    exit 0
-}
-
-show_scan_tcp_xml() {
-    cat /opt/scangrid/tcp/$projectname.xml
-    exit 0
-}
-
-show_scan_udp_normal() {
-    cat /opt/scangrid/udp/$projectname.nmap
-    exit 0
-}
-
-show_scan_tcp_normal() {
-    cat /opt/scangrid/tcp/$projectname.nmap
-    exit 0
+    initials_buffer
+    projectname_buffer
+    echo $testname && tail -2 log.log | grep -v grep | grep "Timing: About" | xargs -n 1 | grep %
+    exit 1
 }
 
 #Help Banner
 display_help() {
     echo -e "\n"
-    echo "   ==============================|$scangrid|======================================="
-    echo "  ||                                                                                ||"
-    echo "  ||                                                                                ||"
-    echo "  || START TCP SCAN:                                                                ||"
-    echo "  || Usage: $scangrid <initials> <projectname> [-t | --tcp ] ''target or targets''||"
-    echo "  ||                                                                                ||"
-    echo "  || START UDP SCAN:                                                                ||"
-    echo "  || Usage: $scangrid <initials> <projectname> [-u | --udp] ''target or targets'' ||"
-    echo "  ||                                                                                ||"
-    echo "  || SCAN FIND:                                                                     ||"
-    echo "  || Usage: $scangrid <initials> <projectname> [-f]                               ||"
-    echo "  ||                                                                                ||"
-    echo "  || SCAN RESULTS IN PERCENT:                                                       ||"
-    echo "  || Usage: $scangrid <initials> <projectname> [-r]                               ||"
-    echo "  ||                                                                                ||"
-    echo "  || SCAN LIST:                                                                     ||"
-    echo "  || Usage: $scangrid <initials> [-l --la --listall]                              ||"
-    echo "  ||                                                                                ||"
-    echo "  || SHOW REPORT:                                                                   ||"
-    echo "  || Usage: $scangrid <initials> <projectname> --rux (for udp xml)                ||"
-    echo "  ||                                             --run (for udp normal)             ||"
-    echo "  ||                                             --rtx (for tcp xml)                ||"
-    echo "  ||                                             --rtn (for tcp normal)             ||"
-    echo "  ||                                                                                ||"
-    echo "  || WHO? WHEARE? HOW?:                                                             ||"
-    echo "  ||        $scangrid [-s --show-logit]                                           ||"
-    echo "  ||                                                                                ||"
-    echo "   =================================================================================="
+    echo "  ==============================|$0|===================================="
+    echo "  ||                                                                           ||"
+    echo "  || START SCAN:                                                               ||"
+    echo "  || Usage: $0 <initials> <projectname> [-s] <path_to_target_file>    ||"
+    echo "  ||                                                                           ||"
+    echo "  || START SUDOSCAN:                                                           ||"
+    echo "  || Usage: $0 <initials> <projectname> [-ss] <path_to_target_file>   ||"
+    echo "  ||                                                                           ||"
+    echo "  || SCAN FIND:                                                                ||"
+    echo "  || Usage: $0 <initials> <projectname> [-f]                          ||"
+    echo "  ||                                                                           ||"
+    echo "  || SCAN RESULTS IN PERCENT:                                                  ||"
+    echo "  || Usage: $0 <initials> <projectname> [-r]                          ||"
+    echo "  ||                                                                           ||"
+    echo "  || SCAN LIST:                                                                ||"
+    echo "  || Usage: $0 <initials> [-l]                                        ||"
+    echo "  ||                                                                           ||"
+    echo "  ==============================================================================="
     echo -e "\n"
     exit 0
 }
 
-#Loop loop whoop whoop 
+#Loop loop whoop whoop! 
+while :
+do
 case $1 in
-   -h | --help |?)
-       logit_buffer
-       display_help
-       exit 0
-       ;;
-   -s | --show-logit)
-       logit_buffer
-       show_logit
-       exit 0
-       ;;
-   -* | --*)
-       logit_buffer
-       display_help
-       exit 0
-       ;;
+    -h | --help |?)
+        logit_buffer
+        display_help
+        ;;
+    -* | --*)
+        logit_buffer
+        display_help
+        ;;
+    *)  logit_buffer
+        break
+        ;;
 esac
 case $2 in
-   -f | --find)
-       logit_buffer
-       projectname_buffer
-       find_func
-       exit 0
-       ;;
-    -l | --la | --listall)
-       logit_buffer
-       list_func
-       exit 0
-       ;;
-   -* | --*)
-       logit_buffer
-       display_help
-       exit 0
-       ;;
+    -l | --list)
+        logit_buffer
+        list_funct
+        ;;
+    -* | --*)
+        logit_buffer
+        display_help
+        exit 0
+        ;;
+    *)  logit_buffer
+        display_help
+        break
+        ;;        
 esac
 case $3 in
-   -m | --mtcp)
-       initials_buffer
-       logit_buffer
-       projectname_buffer
-       mini_tcp_scan_run
-       exit 0
-       ;;
-   -t | --tcp)
-       initials_buffer
-       logit_buffer
-       projectname_buffer
-       tcp_scan_run
-       exit 0
-       ;;
-   -u | --udp)
-       initials_buffer
-       logit_buffer
-       projectname_buffer
-       udp_scan_run
-       exit 0
-       ;;
-   -r | --results)
-       logit_buffer
-       initials_buffer
-       projectname_buffer
-       results_func
-       exit 0
-       ;;
-   --rux)
-       logit_buffer
-       show_scan_udp_xml
-       exit 0
-       ;;
-   --rtx)
-       logit_buffer
-       show_scan_tcp_xml
-       exit 0
-       ;;
-   --run)
-       logit_buffer
-       show_scan_udp_normal
-       exit 0
-       ;;
-   --rtn)
-       logit_buffer
-       show_scan_tcp_normal
-       exit 0
-       ;;
-  --)
-       logit_buffer
-       display_help
-       exit 0
-       ;;
-  -* | --*)
-       logit_buffer
-       display_help
-       exit 0
-       ;;
+    -m | --mtcp)
+        initials_buffer
+        logit_buffer
+        username_buffer
+        projectname_buffer
+        mini_tcp_scan_run
+        exit 0
+        ;;
+    -t | --tcp)
+        initials_buffer
+        logit_buffer
+        username_buffer
+        projectname_buffer
+        tcp_scan_run
+        exit 0
+        ;;
+    -u | --udp)
+        initials_buffer
+        logit_buffer
+        username_buffer
+        projectname_buffer
+        udp_scan_run
+        exit 0
+        ;;
+    -f | --find)
+        initials_buffer
+        logit_buffer
+        username_buffer
+        projectname_buffer
+        find
+        exit 0
+        ;;
+    -r | --results)
+        initials_buffer
+        logit_buffer
+        username_buffer
+        projectname_buffer
+        results
+        exit 0
+        ;;
+        --)
+        logit_buffer
+        display_help
+        exit 0
+        ;;
+    -* | --*)
+        logit_buffer
+        display_help
+        exit 0
+        ;;
+    *)  logit_buffer
+        display_help
+        break
+        ;;
 esac
-find /opt/scangrid/ -type d -exec chmod 750 {} \;
-find /opt/scangrid/ -type f -exec chmod 640 {} \;
-env -i
+done
