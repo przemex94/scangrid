@@ -136,7 +136,7 @@ display_help() {
     echo "  ||                                                                                ||"
     echo "  || SHOW REPORT:                                                                   ||"
     echo "  || Usage: $scangrid <initials> <projectname> --rux (for udp xml)                ||"
-    echo "  ||                                             --run (for udp normal)             ||"
+    echo "  ||                                             --run (for udp normal)             |"
     echo "  ||                                             --rtx (for tcp xml)                ||"
     echo "  ||                                             --rtn (for tcp normal)             ||"
     echo "  ||                                                                                ||"
